@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中华植物研究地图</title>
+<style>
+  :root{
+    --paper: #f4ecd8;
+    --paper-deep: #e9dcc0;
+    --ink: #2f2a24;
+    --ink-soft: #6b5f4e;
+    --cinnabar: #a63a2a;
+    --cinnabar-light: #c2573f;
+    --gold: #b8860b;
+    --gold-light: #d9b45b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    font-family:"Kaiti SC","STKaiti","KaiTi","Noto Serif SC","Songti SC","SimSun",serif;
+    color:var(--ink);
+    background:radial-gradient(ellipse at 50% 20%, #2c2620 0%, #16130f 70%);
+    overflow:hidden;
+  }
+
+  /* ---------- 背景水墨山水 ---------- */
+  .bg-layer{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  .bg-layer img{width:100%;height:100%;object-fit:cover;opacity:.38;}
+  .bg-layer::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg, rgba(15,13,10,.35), rgba(15,13,10,.75));}
+
+  /* ---------- 卷轴标题 ---------- */
+  .header{position:relative;z-index:3;display:flex;align-items:center;justify-content:center;
+    gap:18px;padding:26px 0 10px;}
+  .header .title-wrap{position:relative;text-align:center;padding:0 70px;}
+  .header h1{
+    font-size:42px;letter-spacing:14px;color:#f6ecd6;
+    text-shadow:0 2px 12px rgba(0,0,0,.7), 0 0 2px #000;
+    font-weight:600;}
+  .header .sub{
+    margin-top:6px;font-size:14px;letter-spacing:6px;color:#cbb98f;}
+  .seal{
+    width:64px;height:64px;flex:0 0 auto;border-radius:8px;
+    background:var(--cinnabar);color:#f7e9c8;font-size:26px;line-height:1;
+    display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;
+    box-shadow:0 4px 14px rgba(0,0,0,.5), inset 0 0 0 3px rgba(247,233,200,.5);
+    user-select:none;}
+  .seal small{font-size:11px;}
+
+  /* ---------- 进度条 ---------- */
+  .progress-wrap{position:relative;z-index:3;display:flex;align-items:center;justify-content:center;
+    gap:14px;margin-top:6px;}
+  .progress-track{width:340px;height:10px;border-radius:6px;background:#3a342b;
+    border:1px solid #6b5f4e;overflow:hidden;}
+  .progress-fill{height:100%;width:0%;border-radius:6px;
+    background:linear-gradient(90deg,var(--gold),var(--gold-light));
+    transition:width .6s ease;}
+  .progress-text{font-size:14px;color:#d8c99d;letter-spacing:2px;}
+
+  /* ---------- 主布局 ---------- */
+  .stage{position:relative;z-index:2;display:flex;gap:18px;height:calc(100% - 118px);
+    padding:6px 26px 18px;}
+
+  /* 地图区域 */
+  .map-wrap{position:relative;flex:1;min-width:0;
+    background:rgba(244,236,216,.06);
+    border:1px solid rgba(216,201,157,.35);
+    border-radius:12px;
+    box-shadow:inset 0 0 60px rgba(0,0,0,.55), 0 8px 30px rgba(0,0,0,.4);
+    overflow:hidden;}
+  .map-wrap::before{content:"";position:absolute;inset:10px;border:1px solid rgba(216,201,157,.25);
+    border-radius:8px;pointer-events:none;z-index:1;}
+  #mapSvg{position:absolute;inset:0;width:100%;height:100%;}
+  .map-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+    z-index:5;font-size:13px;letter-spacing:3px;color:#d8c99d;opacity:.85;
+    text-shadow:0 1px 6px #000;pointer-events:none;}
+
+  /* 地图省份样式 */
+  .province{fill:rgba(244,236,216,.10);stroke:#d8c99d;stroke-width:.55;
+    cursor:pointer;transition:fill .25s, filter .25s;}
+  .province:hover{fill:rgba(217,180,91,.55);filter:drop-shadow(0 0 6px rgba(217,180,91,.8));}
+  .province.collected{fill:rgba(184,134,11,.55);stroke:#e8cf8a;}
+  .province.collected:hover{fill:rgba(217,180,91,.7);}
+  .prov-name{fill:#efe5c8;font-size:11px;letter-spacing:1px;
+    text-anchor:middle;pointer-events:none;text-shadow:0 1px 3px #000;}
+
+  /* 图鉴面板 */
+  .panel{width:290px;flex:0 0 auto;display:flex;flex-direction:column;gap:12px;}
+  .panel-card{
+    background:rgba(22,19,15,.7);border:1px solid rgba(216,201,157,.4);border-radius:10px;
+    padding:16px 18px;box-shadow:0 8px 26px rgba(0,0,0,.45);}
+  .panel-card h2{font-size:17px;color:#e8cf8a;letter-spacing:4px;margin-bottom:12px;
+    display:flex;align-items:center;gap:8px;}
+  .panel-card h2::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,#8a7440,transparent);}
+  .panel-list{max-height:330px;overflow-y:auto;padding-right:4px;}
+  .panel-list::-webkit-scrollbar{width:5px;}
+  .panel-list::-webkit-scrollbar-thumb{background:#6b5f4e;border-radius:3px;}
+  .prov-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;
+    font-size:14px;color:#c9bd9b;cursor:pointer;transition:background .2s;}
+  .prov-item:hover{background:rgba(217,180,91,.15);}
+  .prov-item .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#6b5f4e;}
+  .prov-item.collected .dot{background:var(--gold-light);}
+  .prov-item.collected{color:#e8cf8a;}
+  .prov-item .flower{font-size:12px;color:#9a8b66;flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .btn-reset{margin-top:10px;width:100%;padding:7px 0;background:transparent;
+    border:1px solid #8a7440;border-radius:6px;color:#cbb98f;font-size:13px;
+    letter-spacing:3px;cursor:pointer;font-family:inherit;transition:all .2s;}
+  .btn-reset:hover{background:rgba(184,134,11,.2);color:#f6ecd6;}
+  .legend{font-size:12px;color:#9a8b66;line-height:1.9;letter-spacing:1px;}
+  .legend .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;}
+  .legend .dot.u{background:rgba(244,236,216,.12);border:1px solid #d8c99d;}
+  .legend .dot.c{background:rgba(184,134,11,.55);border:1px solid #e8cf8a;}
+
+  /* ---------- 档案弹窗 ---------- */
+  .mask{position:fixed;inset:0;z-index:50;background:rgba(10,8,6,.62);
+    backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;
+    opacity:0;transition:opacity .3s;}
+  .mask.show{display:flex;opacity:1;}
+  .modal{
+    width:640px;max-width:92vw;max-height:86vh;overflow-y:auto;
+    background:linear-gradient(180deg,#f7f0df,#efe2c8);
+    border:1px solid #b8a476;border-radius:12px;
+    box-shadow:0 24px 70px rgba(0,0,0,.6);
+    transform:translateY(20px) scale(.96);transition:transform .3s;}
+  .mask.show .modal{transform:translateY(0) scale(1);}
+  .modal::-webkit-scrollbar{width:6px;}
+  .modal::-webkit-scrollbar-thumb{background:#b8a476;border-radius:3px;}
+  .modal-head{position:relative;display:flex;align-items:center;padding:18px 24px 14px;
+    border-bottom:1px solid #d6c7a4;}
+  .modal-head .prov-title{font-size:24px;letter-spacing:6px;color:#4a3822;}
+  .modal-head .modal-seal{width:52px;height:52px;border-radius:7px;background:var(--cinnabar);
+    color:#f7e9c8;font-size:20px;display:flex;align-items:center;justify-content:center;
+    writing-mode:vertical-rl;margin-left:auto;box-shadow:inset 0 0 0 2px rgba(247,233,200,.5);}
+  .modal-close{position:absolute;top:10px;right:14px;font-size:24px;color:#8a7440;
+    cursor:pointer;line-height:1;background:none;border:none;font-family:inherit;}
+  .modal-close:hover{color:var(--cinnabar);}
+  .modal-body{display:flex;gap:22px;padding:22px 24px 10px;}
+  .plant-img-wrap{width:210px;height:210px;flex:0 0 auto;border:6px solid #e3d5b4;
+    box-shadow:0 6px 20px rgba(0,0,0,.25);background:#f2ead6;overflow:hidden;position:relative;}
+  .plant-img-wrap img{width:100%;height:100%;object-fit:cover;display:block;}
+  .plant-img-wrap .loading{position:absolute;inset:0;display:flex;align-items:center;
+    justify-content:center;font-size:13px;color:#8a7440;letter-spacing:2px;background:#f2ead6;}
+  .plant-info{flex:1;min-width:0;}
+  .plant-name{font-size:30px;color:#4a3822;letter-spacing:4px;margin-bottom:4px;}
+  .plant-latin{font-size:13px;color:#8a7440;font-style:italic;margin-bottom:14px;}
+  .plant-meta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .plant-tag{padding:3px 12px;border:1px solid #b8a476;border-radius:20px;
+    font-size:13px;color:#6b4f2e;background:#fbf6e8;}
+  .plant-desc{font-size:15px;line-height:2;color:#4a3822;text-align:justify;}
+  .modal-foot{padding:14px 24px 22px;display:flex;align-items:center;gap:14px;}
+  .btn-collect{padding:10px 30px;background:var(--cinnabar);color:#f7e9c8;
+    border:none;border-radius:6px;font-size:16px;letter-spacing:4px;cursor:pointer;
+    font-family:inherit;box-shadow:0 4px 14px rgba(166,58,42,.4);transition:all .2s;}
+  .btn-collect:hover{background:var(--cinnabar-light);}
+  .btn-collect:disabled{background:#b8a476;cursor:default;box-shadow:none;}
+  .modal-foot .hint{font-size:13px;color:#8a7440;letter-spacing:1px;}
+
+  /* 开场动画 */
+  .intro{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,#241e17,#0d0b08);transition:opacity 1s;}
+  .intro.hide{opacity:0;pointer-events:none;}
+  .intro .scroll{text-align:center;color:#e6d3a8;letter-spacing:10px;font-size:22px;
+    animation:unroll 2.4s ease forwards;opacity:0;}
+  @keyframes unroll{0%{opacity:0;transform:scaleX(.2);}60%{opacity:1;transform:scaleX(1.02);}100%{opacity:1;transform:scaleX(1);}}
+  .intro .scroll b{display:block;font-size:40px;letter-spacing:16px;color:#f6ecd6;
+    text-shadow:0 0 24px rgba(217,180,91,.5);margin-bottom:12px;}
+
+  /* 提示气泡 */
+  .tip{position:absolute;z-index:6;pointer-events:none;background:rgba(22,19,15,.9);
+    border:1px solid #d8c99d;color:#f0e4c0;padding:6px 12px;border-radius:6px;
+    font-size:13px;letter-spacing:2px;display:none;white-space:nowrap;
+    box-shadow:0 4px 12px rgba(0,0,0,.5);}
+
+  @media (max-width:900px){
+    .stage{flex-direction:column;height:auto;}
+    .panel{width:100%;}
+    .map-wrap{height:60vh;}
+    .header h1{font-size:28px;letter-spacing:8px;}
+    .seal{display:none;}
+  }
+</style>
+</head>
+<body>
+  <!-- 背景 -->
+  <div class="bg-layer"><img id="bgImg" alt=""></div>
+
+  <!-- 开场卷轴 -->
+  <div class="intro" id="intro">
+    <div class="scroll"><b>中华植物研究地图</b>一卷江山 · 万木争荣</div>
+  </div>
+
+  <!-- 标题 -->
+  <header class="header">
+    <div class="seal">中<small>华</small></div>
+    <div class="title-wrap">
+      <h1>中华植物研究地图</h1>
+      <div class="sub">集 百 省 灵 秀 · 录 华 夏 芳 华</div>
+    </div>
+    <div class="seal">植<small>物</small></div>
+  </header>
+
+  <!-- 进度 -->
+  <div class="progress-wrap">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">0 / 34</div>
+  </div>
+
+  <!-- 主舞台 -->
+  <div class="stage">
+    <div class="map-wrap" id="mapWrap">
+      <svg id="mapSvg" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="map-hint" id="mapHint">轻触省域 · 查阅植物档案</div>
+      <div class="tip" id="tip"></div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-card">
+        <h2>植物图鉴</h2>
+        <div class="panel-list" id="panelList"></div>
+      </div>
+      <div class="panel-card">
+        <h2>研习须知</h2>
+        <div class="legend">
+          <div><span class="dot u"></span>未研习的省份</div>
+          <div><span class="dot c"></span>已收集的省花</div>
+          <div style="margin-top:6px;">点击地图省域，查阅代表植物档案并收集徽章。收集进度自动保存。</div>
+        </div>
+        <button class="btn-reset" id="btnReset">重置研习记录</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 档案弹窗 -->
+  <div class="mask" id="mask">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="prov-title" id="mProv"></span>
+        <button class="modal-close" id="mClose">×</button>
+        <div class="modal-seal">省<small>花</small></div>
+      </div>
+      <div class="modal-body">
+        <div class="plant-img-wrap">
+          <div class="loading" id="mLoading">丹青绘就中…</div>
+          <img id="mImg" alt="">
+        </div>
+        <div class="plant-info">
+          <div class="plant-name" id="mName"></div>
+          <div class="plant-latin" id="mLatin"></div>
+          <div class="plant-meta">
+            <span class="plant-tag" id="mFamily"></span>
+          </div>
+          <div class="plant-desc" id="mDesc"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-collect" id="mCollect">收入图鉴</button>
+        <span class="hint" id="mHint"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="plants.js"></script>
+  <script src="map.js"></script>
+</body>
+</html>
